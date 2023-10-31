@@ -15,10 +15,22 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser())
  
- const verify=(req,res,next)=>{
+ const verify= async(req,res,next)=>{
       const token=req?.cookies?.token;
-      console.log('token in the middleware',token)
-      next();
+    //   console.log('token in the middleware',token)
+      if(!token){
+        return res.status(401).send({message: 'Unauthorized access'})
+      }
+       jwt.verify (token,process.env.ACCESS_TOKEN_SECRET,(error,decoded)=>{
+          if(error){
+            return res.status(401).send({message: 'Unauthorized access'})
+          }
+          req.user=decoded
+        //   console.log('from middleware', decoded)
+          next()
+      }
+      )
+
  }
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.sikjemj.mongodb.net/?retryWrites=true&w=majority`;
@@ -44,7 +56,7 @@ async function run() {
         app.post('/jwt', async(req,res)=>{
                const user=req.body 
             
-               const token=jwt.sign(user,process.env.ACCESS_TOKEN_SECRET,{expiresIn:'1h'})
+               const token=jwt.sign(user,process.env.ACCESS_TOKEN_SECRET,{expiresIn:'5h'})
 
 
                res
@@ -88,7 +100,9 @@ async function run() {
 
         // bookings 
         app.get('/bookings', verify, async (req, res) => {
-            
+            if(req.user.email !== req.query.email){
+                 return res.status(401).send({message:'forbidden access'})
+            }
             let query = {};
             if (req.query?.email) {
                 query = { email: req.query.email }
@@ -99,7 +113,6 @@ async function run() {
 
         app.post('/bookings', async (req, res) => {
             const booking = req.body;
-
             const result = await bookingCollection.insertOne(booking);
             res.send(result);
         });
